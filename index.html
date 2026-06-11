@@ -462,7 +462,7 @@ tbody tr:hover td { background: var(--surface2); }
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyawAbqNeLB9Ta5HWKVsVub16rcOD-SgHM6EB6MwwfpDzuoHZwid_uPJusgMcwy3EA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIl2BOP1bkC208loSFi9s5NzJUBChIW038fSR3t9cIhZoliUgYc1CgfX0ud_KLUN4r/exec";
 const FOODS = [
   { id:0, name:'계란+올리브오일+후추', short:'계란+오일' },
   { id:1, name:'생과일 오렌지 반 개',  short:'생오렌지' },
@@ -750,6 +750,29 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+async function loadFromSheet() {
+  try {
+    showToast('이전 데이터 불러오는 중...');
+    const url = SCRIPT_URL + '?action=read';
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.status === 'ok' && json.data.length > 0) {
+      json.data.forEach(row => {
+        const g = parseInt(row.group) - 1;
+        const fi = FOODS.findIndex(f => f.name === row.food);
+        if (g >= 0 && g < NUM_GROUPS && fi >= 0) {
+          data[g][fi].before = String(row.before);
+          data[g][fi].after  = String(row.after);
+        }
+      });
+      buildFoodGrid();
+      showToast('이전 데이터를 불러왔습니다.');
+    }
+  } catch(err) {
+    // 불러오기 실패해도 조용히 넘어감
+  }
+}
+
 async function submitToSheet() {
   const rows = [];
   FOODS.forEach((f, fi) => {
@@ -784,6 +807,7 @@ async function submitToSheet() {
 
 buildGroupTabs();
 buildFoodGrid();
+loadFromSheet();
 </script>
 </body>
 </html>
