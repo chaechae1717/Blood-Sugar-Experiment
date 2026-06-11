@@ -374,6 +374,7 @@ tbody tr:hover td { background: var(--surface2); }
   <div class="action-row">
     <button class="btn btn-primary" onclick="switchTab('analysis')">전체 분석 보기 →</button>
     <button class="btn btn-secondary" onclick="exportCSV()">CSV 저장</button>
+    <button class="btn btn-primary" onclick="submitToSheet()">구글 시트에 제출</button>
     <button class="btn btn-danger" onclick="clearGroup()">이 모둠 초기화</button>
   </div>
 </div>
@@ -461,6 +462,7 @@ tbody tr:hover td { background: var(--surface2); }
 </div>
 
 <script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkcUAwhXqHnefmDTM455tFLDByiaZ4XVHJDFqcS0FhTf3t-2wimhOfSD-IqLm9Rtdz/exec";
 const FOODS = [
   { id:0, name:'계란+올리브오일+후추', short:'계란+오일' },
   { id:1, name:'생과일 오렌지 반 개',  short:'생오렌지' },
@@ -746,6 +748,39 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function submitToSheet() {
+  const rows = [];
+  FOODS.forEach((f, fi) => {
+    const d = data[currentGroup][fi];
+    const delta = getDelta(d);
+    if (d.before !== '' && d.after !== '') {
+      rows.push({
+        group: (currentGroup + 1) + '모둠',
+        food: f.name,
+        before: d.before,
+        after: d.after,
+        delta: delta
+      });
+    }
+  });
+  if (rows.length === 0) {
+    showToast('입력된 데이터가 없습니다.');
+    return;
+  }
+  showToast('제출 중...');
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    showToast((currentGroup+1) + '모둠 데이터가 구글 시트에 제출되었습니다!');
+  } catch (err) {
+    showToast('제출 실패. 인터넷 연결을 확인하세요.');
+  }
 }
 
 buildGroupTabs();
