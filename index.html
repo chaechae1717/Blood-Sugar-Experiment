@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>혈당 변화 실험 기록기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f8f7f4;
+  --surface: #ffffff;
+  --surface2: #f2f1ee;
+  --border: rgba(0,0,0,0.1);
+  --border-strong: rgba(0,0,0,0.2);
+  --text: #1a1a1a;
+  --text-muted: #6b6b6b;
+  --text-faint: #9e9e9e;
+  --accent: #1a1a1a;
+  --red-bg: #fce8e8; --red-text: #952020;
+  --amber-bg: #fef3da; --amber-text: #7a4800;
+  --green-bg: #e8f5e0; --green-text: #2e6610;
+  --blue-bg: #e6f0fb; --blue-text: #1555a0;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161614;
+    --surface: #1e1e1c;
+    --surface2: #272724;
+    --border: rgba(255,255,255,0.1);
+    --border-strong: rgba(255,255,255,0.2);
+    --text: #e8e8e4;
+    --text-muted: #9a9a94;
+    --text-faint: #5a5a54;
+    --red-bg: #3a1212; --red-text: #f09090;
+    --amber-bg: #2e1e04; --amber-text: #f0b84a;
+    --green-bg: #0e2608; --green-text: #7ecb50;
+    --blue-bg: #0c1e38; --blue-text: #7ab8f5;
+  }
+}
+
+body {
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.header-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.header-actions { display: flex; gap: 8px; }
+
+.container { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+
+.tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 0.5px solid var(--border);
+  margin-bottom: 24px;
+}
+.tab-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  font-weight: 600;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.group-tab {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+.group-tab.active {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.info-box {
+  background: var(--blue-bg);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--blue-text);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.food-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.food-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  transition: border-color 0.15s;
+}
+.food-card:focus-within { border-color: var(--border-strong); }
+
+.food-num {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+.food-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+  line-height: 1.4;
+  min-height: 36px;
+}
+
+.input-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.input-group { display: flex; flex-direction: column; gap: 4px; }
+.input-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.input-wrap { display: flex; align-items: center; gap: 4px; }
+.bg-input {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface2);
+  color: var(--text);
+  text-align: right;
+  font-family: 'SF Mono', 'Fira Mono', monospace;
+  transition: border-color 0.15s;
+}
+.bg-input:focus { outline: none; border-color: var(--text); }
+.unit-sm { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+
+.delta-row { display: flex; align-items: center; justify-content: space-between; }
+.delta-label { font-size: 11px; color: var(--text-muted); }
+.delta-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.d-high { background: var(--red-bg); color: var(--red-text); }
+.d-mid  { background: var(--amber-bg); color: var(--amber-text); }
+.d-low  { background: var(--green-bg); color: var(--green-text); }
+.d-none { background: var(--surface2); color: var(--text-faint); }
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.btn {
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.12s;
+}
+.btn:hover { opacity: 0.8; }
+.btn-primary { background: var(--text); color: var(--bg); border: none; }
+.btn-secondary { background: transparent; color: var(--text); border: 0.5px solid var(--border-strong); }
+.btn-danger { background: transparent; color: var(--red-text); border: 0.5px solid var(--red-text); }
+
+.chart-wrap { position: relative; width: 100%; height: 300px; margin-bottom: 24px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 0.5px solid var(--border);
+}
+td {
+  padding: 9px 12px;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--surface2); }
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.stat-card-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.stat-card-value { font-size: 22px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.ws-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+.ws-q { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.ws-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+.ws-answer {
+  width: 100%;
+  min-height: 72px;
+  font-size: 13px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--surface2);
+  color: var(--text);
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+}
+.ws-answer:focus { outline: none; border-color: var(--text); }
+
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 999;
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  header { padding: 12px 16px; }
+  .food-grid { grid-template-columns: 1fr; }
+  .input-pair { grid-template-columns: 1fr 1fr; }
+  .tab-btn { padding: 10px 14px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<header>
+  <div>
+    <div class="header-title">혈당 변화 실험 기록기</div>
+    <div class="header-sub">생활 속 2형 당뇨 예방 교육</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary" onclick="exportCSV()">CSV 저장</button>
+    <label class="btn btn-secondary" style="cursor:pointer">
+      CSV 불러오기
+      <input type="file" accept=".csv" onchange="importCSV(event)" style="display:none">
+    </label>
+  </div>
+</header>
+
+<div class="container">
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('record')">데이터 기록</button>
+  <button class="tab-btn" onclick="switchTab('analysis')">전체 분석</button>
+  <button class="tab-btn" onclick="switchTab('worksheet')">분석 워크시트</button>
+</div>
+
+<!-- 데이터 기록 -->
+<div id="tab-record" class="tab-panel active">
+  <div class="section-label">모둠 선택</div>
+  <div class="group-tabs" id="groupTabs"></div>
+
+  <div class="info-box">
+    섭취 전 혈당과 30분 후 혈당을 입력하세요. Δ혈당이 자동 계산됩니다.<br>
+    <strong>통제 조건:</strong> 실험 1시간 전 금식 · 측정 전 손 세척 · 측정 중 안정 상태 유지
+  </div>
+
+  <div class="section-label">혈당 입력 (mg/dL)</div>
+  <div class="food-grid" id="foodGrid"></div>
+
+  <div class="action-row">
+    <button class="btn btn-primary" onclick="switchTab('analysis')">전체 분석 보기 →</button>
+    <button class="btn btn-secondary" onclick="exportCSV()">CSV 저장</button>
+    <button class="btn btn-danger" onclick="clearGroup()">이 모둠 초기화</button>
+  </div>
+</div>
+
+<!-- 전체 분석 -->
+<div id="tab-analysis" class="tab-panel">
+  <div class="section-label">요약 통계</div>
+  <div class="stat-grid" id="statGrid"></div>
+
+  <div class="section-label">음식별 평균 혈당 변화량</div>
+  <div class="chart-wrap">
+    <canvas id="barChart" role="img" aria-label="음식별 평균 Δ혈당 막대 그래프"></canvas>
+  </div>
+
+  <div class="section-label">음식별 요약표</div>
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr>
+      <th>음식</th><th>측정 수</th><th>평균 Δ혈당</th><th>최솟값</th><th>최댓값</th><th>판정</th>
+    </tr></thead>
+    <tbody id="summaryBody"></tbody>
+  </table>
+  </div>
+
+  <div class="section-label">모둠별 원시 데이터</div>
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr>
+      <th>모둠</th><th>음식</th><th>섭취 전</th><th>30분 후</th><th>Δ혈당</th>
+    </tr></thead>
+    <tbody id="rawBody"></tbody>
+  </table>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-secondary" onclick="exportCSV()">CSV 저장</button>
+  </div>
+</div>
+
+<!-- 워크시트 -->
+<div id="tab-worksheet" class="tab-panel">
+  <div class="info-box">실험 결과를 바탕으로 아래 질문에 답하세요. 분석 탭을 함께 참고하세요.</div>
+
+  <div class="ws-card">
+    <div class="ws-q">1. 혈당 변화가 가장 컸던 음식과 가장 작았던 음식은 무엇인가요?</div>
+    <div class="ws-hint">분석 탭의 평균 Δ혈당 수치를 참고해 음식 이름과 수치를 함께 적으세요.</div>
+    <textarea class="ws-answer" id="ws1" placeholder="예) 가장 큰 변화: 코카콜라 +__ mg/dL / 가장 작은 변화: 계란+오일 +__ mg/dL"></textarea>
+  </div>
+
+  <div class="ws-card">
+    <div class="ws-q">2. 생과일 오렌지와 카프리썬의 혈당 변화를 비교하고, 차이가 생긴 이유를 설명하세요.</div>
+    <div class="ws-hint">키워드: 식이섬유 / 당의 형태(과당·포도당) / 흡수 속도 / 혈당지수(GI)</div>
+    <textarea class="ws-answer" id="ws2" placeholder="두 음식의 수치 차이와 그 이유를 연결해서 써보세요."></textarea>
+  </div>
+
+  <div class="ws-card">
+    <div class="ws-q">3. 제로 음료(콜라 제로, 카프리썬 제로)는 혈당 면에서 안전한가요? 혈당 너머의 위험은 없을까요?</div>
+    <div class="ws-hint">키워드: 인공감미료 / 인슐린 반응 / 장내 미생물 / 식욕 증가</div>
+    <textarea class="ws-answer" id="ws3" placeholder="수치 비교 + 혈당 너머의 건강 영향을 함께 써보세요."></textarea>
+  </div>
+
+  <div class="ws-card">
+    <div class="ws-q">4. 계란+올리브오일+후추는 왜 혈당 변화가 적을까요? SNS의 '천연 위고비' 표현은 적절한가요?</div>
+    <div class="ws-hint">키워드: 혈당지수(GI) / 포만감 호르몬(GLP-1) / 지방·단백질의 소화 속도</div>
+    <textarea class="ws-answer" id="ws4" placeholder="영양소 구성 → 혈당 패턴 → SNS 표현의 적절성 순으로 써보세요."></textarea>
+  </div>
+
+  <div class="ws-card">
+    <div class="ws-q">5. 이번 실험의 한계점 2가지와 개선 방안을 제시하세요.</div>
+    <div class="ws-hint">힌트: 표본 수 / 선택 편향 / 측정 시점 / 개인 차이 / 통제 조건</div>
+    <textarea class="ws-answer" id="ws5" placeholder="한계점 2가지 + 각 개선 방안을 구체적으로 써보세요."></textarea>
+  </div>
+
+  <div class="ws-card">
+    <div class="ws-q">6. 실험 결과를 바탕으로 2형 당뇨 예방을 위한 실천 방안 3가지를 제안하세요.</div>
+    <div class="ws-hint">음료 선택 / 식사 순서 / 식후 운동 / 가공식품 줄이기 등에서 골라보세요.</div>
+    <textarea class="ws-answer" id="ws6" placeholder="구체적이고 실천 가능한 내용으로 적어보세요."></textarea>
+  </div>
+
+  <div class="action-row">
+    <button class="btn btn-secondary" onclick="saveWorksheet()">워크시트 저장 (CSV)</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+const FOODS = [
+  { id:0, name:'계란+올리브오일+후추', short:'계란+오일' },
+  { id:1, name:'생과일 오렌지 반 개',  short:'생오렌지' },
+  { id:2, name:'카프리썬 오렌지 200ml', short:'카프리썬' },
+  { id:3, name:'카프리썬 제로 200ml',  short:'카프리썬 제로' },
+  { id:4, name:'코카콜라 250ml',        short:'콜라' },
+  { id:5, name:'코카콜라 제로 250ml',   short:'콜라 제로' },
+];
+const NUM_GROUPS = 8;
+let currentGroup = 0;
+let data = Array.from({length: NUM_GROUPS}, () =>
+  Array.from({length: 6}, () => ({ before:'', after:'' }))
+);
+let barChartInst = null;
+
+function getDelta(d) {
+  if (d.before === '' || d.after === '') return null;
+  return Math.round(Number(d.after) - Number(d.before));
+}
+
+function deltaClass(v) {
+  if (v === null) return 'd-none';
+  if (v >= 30) return 'd-high';
+  if (v >= 10) return 'd-mid';
+  return 'd-low';
+}
+
+function deltaText(v) {
+  if (v === null) return '미입력';
+  return (v >= 0 ? '+' : '') + v + ' mg/dL';
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['record','analysis','worksheet'][i] === id);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  if (id === 'analysis') renderAnalysis();
+}
+
+function buildGroupTabs() {
+  const el = document.getElementById('groupTabs');
+  el.innerHTML = '';
+  for (let g = 0; g < NUM_GROUPS; g++) {
+    const btn = document.createElement('button');
+    btn.className = 'group-tab' + (g === currentGroup ? ' active' : '');
+    btn.textContent = (g+1) + '모둠';
+    btn.onclick = () => { currentGroup = g; buildGroupTabs(); buildFoodGrid(); };
+    el.appendChild(btn);
+  }
+}
+
+function buildFoodGrid() {
+  const el = document.getElementById('foodGrid');
+  el.innerHTML = '';
+  FOODS.forEach((f, fi) => {
+    const d = data[currentGroup][fi];
+    const delta = getDelta(d);
+    const card = document.createElement('div');
+    card.className = 'food-card';
+    card.innerHTML = `
+      <div class="food-num">음식 ${fi+1}</div>
+      <div class="food-name">${f.name}</div>
+      <div class="input-pair">
+        <div class="input-group">
+          <div class="input-label">섭취 전</div>
+          <div class="input-wrap">
+            <input class="bg-input" type="number" min="50" max="400" placeholder="—"
+              value="${d.before}" oninput="updateData(${currentGroup},${fi},'before',this.value)">
+          </div>
+          <div class="unit-sm">mg/dL</div>
+        </div>
+        <div class="input-group">
+          <div class="input-label">30분 후</div>
+          <div class="input-wrap">
+            <input class="bg-input" type="number" min="50" max="400" placeholder="—"
+              value="${d.after}" oninput="updateData(${currentGroup},${fi},'after',this.value)">
+          </div>
+          <div class="unit-sm">mg/dL</div>
+        </div>
+      </div>
+      <div class="delta-row">
+        <span class="delta-label">혈당 변화량 (Δ)</span>
+        <span class="delta-badge ${deltaClass(delta)}">${deltaText(delta)}</span>
+      </div>
+    `;
+    el.appendChild(card);
+  });
+}
+
+function updateData(g, fi, field, val) {
+  data[g][fi][field] = val;
+  const cards = document.querySelectorAll('.food-card');
+  if (cards[fi]) {
+    const d = data[g][fi];
+    const delta = getDelta(d);
+    const badge = cards[fi].querySelector('.delta-badge');
+    if (badge) {
+      badge.className = 'delta-badge ' + deltaClass(delta);
+      badge.textContent = deltaText(delta);
+    }
+  }
+}
+
+function clearGroup() {
+  if (!confirm((currentGroup+1) + '모둠 데이터를 초기화할까요?')) return;
+  data[currentGroup] = Array.from({length:6}, () => ({before:'', after:''}));
+  buildFoodGrid();
+  showToast((currentGroup+1) + '모둠 데이터가 초기화되었습니다.');
+}
+
+function renderAnalysis() {
+  const foodStats = FOODS.map((f, fi) => {
+    const deltas = [];
+    for (let g = 0; g < NUM_GROUPS; g++) {
+      const delta = getDelta(data[g][fi]);
+      if (delta !== null) deltas.push(delta);
+    }
+    const avg = deltas.length ? Math.round(deltas.reduce((a,b)=>a+b,0)/deltas.length) : null;
+    return { food:f, deltas, avg, min: deltas.length ? Math.min(...deltas) : null, max: deltas.length ? Math.max(...deltas) : null, n: deltas.length };
+  });
+
+  const allDeltas = foodStats.flatMap(s => s.deltas);
+  const totalN = allDeltas.length;
+  const overallAvg = totalN ? Math.round(allDeltas.reduce((a,b)=>a+b,0)/totalN) : 0;
+  const highCount = allDeltas.filter(v => v >= 30).length;
+  const maxFood = foodStats.reduce((a,b) => (b.avg ?? -Infinity) > (a.avg ?? -Infinity) ? b : a, foodStats[0]);
+
+  const sg = document.getElementById('statGrid');
+  sg.innerHTML = `
+    <div class="stat-card"><div class="stat-card-label">총 측정 수</div><div class="stat-card-value">${totalN}명</div></div>
+    <div class="stat-card"><div class="stat-card-label">전체 평균 Δ혈당</div><div class="stat-card-value">${totalN ? (overallAvg >= 0 ? '+' : '') + overallAvg : '—'}</div></div>
+    <div class="stat-card"><div class="stat-card-label">+30 이상 인원</div><div class="stat-card-value">${highCount}명</div></div>
+    <div class="stat-card"><div class="stat-card-label">최고 변화 음식</div><div class="stat-card-value" style="font-size:14px;padding-top:4px">${maxFood.avg !== null ? maxFood.food.short : '—'}</div></div>
+  `;
+
+  const summaryBody = document.getElementById('summaryBody');
+  summaryBody.innerHTML = '';
+  foodStats.forEach(s => {
+    const j = s.avg === null ? '—' : s.avg >= 30 ? '주의 필요' : s.avg >= 10 ? '보통' : '양호';
+    const jc = s.avg === null ? 'd-none' : s.avg >= 30 ? 'd-high' : s.avg >= 10 ? 'd-mid' : 'd-low';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${s.food.name}</td>
+      <td>${s.n}명</td>
+      <td style="font-weight:600">${s.avg !== null ? (s.avg >= 0 ? '+' : '') + s.avg : '—'}</td>
+      <td>${s.min !== null ? (s.min >= 0 ? '+' : '') + s.min : '—'}</td>
+      <td>${s.max !== null ? (s.max >= 0 ? '+' : '') + s.max : '—'}</td>
+      <td><span class="delta-badge ${jc}" style="font-size:11px">${j}</span></td>
+    `;
+    summaryBody.appendChild(tr);
+  });
+
+  const rawBody = document.getElementById('rawBody');
+  rawBody.innerHTML = '';
+  let hasAny = false;
+  for (let g = 0; g < NUM_GROUPS; g++) {
+    FOODS.forEach((f, fi) => {
+      const d = data[g][fi];
+      if (d.before !== '' || d.after !== '') {
+        hasAny = true;
+        const delta = getDelta(d);
+        const dc = deltaClass(delta);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${g+1}모둠</td>
+          <td>${f.short}</td>
+          <td>${d.before || '—'}</td>
+          <td>${d.after || '—'}</td>
+          <td><span class="delta-badge ${dc}" style="font-size:11px">${deltaText(delta)}</span></td>
+        `;
+        rawBody.appendChild(tr);
+      }
+    });
+  }
+  if (!hasAny) {
+    rawBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-faint);padding:24px">아직 입력된 데이터가 없습니다.</td></tr>';
+  }
+
+  const avgs = foodStats.map(s => s.avg ?? 0);
+  const barColors = avgs.map(v => v >= 30 ? '#E24B4A' : v >= 10 ? '#EF9F27' : '#639922');
+
+  if (barChartInst) barChartInst.destroy();
+  barChartInst = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: FOODS.map(f => f.short),
+      datasets: [{
+        label: '평균 Δ혈당 (mg/dL)',
+        data: avgs,
+        backgroundColor: barColors,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y + ' mg/dL' } }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: 'Δ혈당 (mg/dL)', font: { size: 12 }, color: '#888' },
+          ticks: { callback: v => (v >= 0 ? '+' : '') + v }
+        },
+        x: { ticks: { font: { size: 12 }, autoSkip: false } }
+      }
+    }
+  });
+}
+
+function exportCSV() {
+  let csv = '\uFEFF모둠,음식,섭취전(mg/dL),30분후(mg/dL),Δ혈당(mg/dL)\n';
+  for (let g = 0; g < NUM_GROUPS; g++) {
+    FOODS.forEach((f, fi) => {
+      const d = data[g][fi];
+      const delta = getDelta(d);
+      csv += `${g+1}모둠,${f.name},${d.before},${d.after},${delta !== null ? delta : ''}\n`;
+    });
+  }
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '혈당실험_데이터_' + new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','') + '.csv';
+  a.click();
+  showToast('CSV 파일이 저장되었습니다.');
+}
+
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').slice(1);
+    data = Array.from({length: NUM_GROUPS}, () =>
+      Array.from({length: 6}, () => ({ before:'', after:'' }))
+    );
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const cols = line.split(',');
+      const g = parseInt(cols[0]) - 1;
+      const foodName = cols[1]?.trim();
+      const fi = FOODS.findIndex(f => f.name === foodName);
+      if (g >= 0 && g < NUM_GROUPS && fi >= 0) {
+        data[g][fi].before = cols[2]?.trim() || '';
+        data[g][fi].after  = cols[3]?.trim() || '';
+      }
+    });
+    buildFoodGrid();
+    showToast('데이터를 불러왔습니다.');
+  };
+  reader.readAsText(file, 'UTF-8');
+  event.target.value = '';
+}
+
+function saveWorksheet() {
+  const ids = ['ws1','ws2','ws3','ws4','ws5','ws6'];
+  const qs = [
+    '혈당 변화가 가장 컸던/작았던 음식',
+    '생과일 오렌지 vs 카프리썬 비교',
+    '제로 음료의 안전성',
+    '계란+오일 메커니즘 및 SNS 표현 평가',
+    '실험 한계점 및 개선 방안',
+    '2형 당뇨 예방 실천 방안',
+  ];
+  let csv = '\uFEFF질문,답변\n';
+  ids.forEach((id, i) => {
+    const val = document.getElementById(id)?.value.replace(/"/g,'""') || '';
+    csv += `"${qs[i]}","${val}"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '혈당실험_워크시트_' + new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','') + '.csv';
+  a.click();
+  showToast('워크시트가 저장되었습니다.');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+buildGroupTabs();
+buildFoodGrid();
+</script>
+</body>
+</html>
