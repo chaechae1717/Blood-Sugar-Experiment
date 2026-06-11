@@ -462,7 +462,7 @@ tbody tr:hover td { background: var(--surface2); }
 </div>
 
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkcUAwhXqHnefmDTM455tFLDByiaZ4XVHJDFqcS0FhTf3t-2wimhOfSD-IqLm9Rtdz/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxyawAbqNeLB9Ta5HWKVsVub16rcOD-SgHM6EB6MwwfpDzuoHZwid_uPJusgMcwy3EA/exec";
 const FOODS = [
   { id:0, name:'계란+올리브오일+후추', short:'계란+오일' },
   { id:1, name:'생과일 오렌지 반 개',  short:'생오렌지' },
@@ -771,12 +771,11 @@ async function submitToSheet() {
   }
   showToast('제출 중...');
   try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows })
-    });
+    const encoded = encodeURIComponent(JSON.stringify(rows));
+    const url = SCRIPT_URL + '?data=' + encoded;
+    const img = new Image();
+    img.src = url;
+    await new Promise(resolve => setTimeout(resolve, 2000));
     showToast((currentGroup+1) + '모둠 데이터가 구글 시트에 제출되었습니다!');
   } catch (err) {
     showToast('제출 실패. 인터넷 연결을 확인하세요.');
